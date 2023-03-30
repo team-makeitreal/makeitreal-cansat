@@ -24,15 +24,16 @@ Adafruit_Sensor *bmp_pressure = bmp.getPressureSensor();
 
 String outgoing;
 byte msgCount = 0;            // count of outgoing messages
-byte localAddress = 0xDD;   // address of this device
+byte localAddress = 0xBB;   // address of this device
 byte baza = 0xFF;      // destination to send to
 byte node1 = 0xCC;
-byte node2 = 0xBB;
+byte node2 = 0xDD;
 long lastSendTime = 0;        // last send time
 int interval = 900;          // interval between sends
 bool userconnected = false;
 byte useraddress;
 bool ismain = false;
+bool sleeping = false;
 
 String inbox= "";
 String incoming;
@@ -81,6 +82,7 @@ void setup() {
   bmp_temp->printSensorDetails();
   
   LoRa.setPins(8, 9, 7);
+  LoRa.setSignalBandwidth(250E3);
   if (!LoRa.begin(433E6)) {
     Serial.println("Starting LoRa failed!");
     while (1);
@@ -166,13 +168,15 @@ void loop() {
         inbox = "";
         frombaza = "";
       }
-      if(ismain == true){
-        sendmessage(inboxmessage, localAddress, baza);
-      }  
-      sendmessage(dataString, localAddress, node1);
-      sendmessage(dataString, localAddress, node2);
-      if(userconnected == true){
-        sendmessage(inboxmessage, localAddress, useraddress);
+      if(sleeping == false){
+        if(ismain == true){
+          sendmessage(inboxmessage, localAddress, baza);
+        }  
+        sendmessage(dataString, localAddress, node1);
+        sendmessage(dataString, localAddress, node2);
+        if(userconnected == true){
+          sendmessage(inboxmessage, localAddress, useraddress);
+        }
       }
       //save file
       File dataFile = SD.open("datalog.txt", FILE_WRITE);
@@ -295,6 +299,12 @@ void definesender(byte sender, String LoRaData){
       if(message == "nmain"){
           ismain = false;
         }
+      if(message == "sleep"){
+        sleeping = true;
       }
+      if(message == "wakeup"){
+        sleeping = false;}
+      }
+      
       
 }

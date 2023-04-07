@@ -1,16 +1,4 @@
-// adressing messages needs implementing DONE
-// recieving adressed messages DONE
-
-// checking and upgreading the recieving system DONE 
-// working on a inbox system using a dictionary and a arduino Map library DONE NOT USING DICTIONARY
-
-// chceck what happens when recieving from two devices at once 
-
-//chceck adresses of other nodes and add them to define adress DONE
-
-//add RSSI of messages from other nodes
-
-//add modes (before start, during fall and after landing
+// MakeItReal 2023 Nataniel Slowikowski
 
 #include <Wire.h>
 #include <SPI.h>
@@ -22,28 +10,32 @@ Adafruit_BMP280 bmp; // use I2C interface
 Adafruit_Sensor *bmp_temp = bmp.getTemperatureSensor();
 Adafruit_Sensor *bmp_pressure = bmp.getPressureSensor();
 
-String outgoing;
-byte msgCount = 0;            // count of outgoing messages
+
 byte localAddress = 0xBB;   // address of this device
-byte baza = 0xFF;      // destination to send to
-byte node1 = 0xCC;
-byte node2 = 0xDD;
-long lastSendTime = 0;        // last send time
-int interval = 900;          // interval between sends
-bool userconnected = false;
-byte useraddress;
-bool ismain = false;
-bool sleeping = false;
+byte baza = 0xFF;    
+byte node1 = 0xCC;   // 0xCC or 0xDD if 0xCC ismain
+byte node2 = 0xDD;   // 0xBB or 0xDD if 0xBB ismain
 
 String inbox= "";
 String incoming;
 String frombaza;
 String fromnode1;
 String fromnode2;
-
 String inboxmessage = "";
 
+
+long lastSendTime = 0;        // last send time
+int interval = 900;          // interval between sends
+
+bool userconnected = false;
+byte useraddress;
+
+bool ismain = false;
+bool sleeping = false;
+
+
 const int chipSelect = 13;
+int powerLEDpin =0;
 
 bool liftoff = false;
 float previouspressure = 1000;
@@ -54,12 +46,19 @@ void setup() {
   SPI1.setRX(12); //16 12
   SPI1.setTX(15); //20 15
   SPI1.setSCK(14); //19 14
-  SPI1.setCS(13); //17 13
+  SPI1.setCS(13); //17 13 
+   
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(powerLEDpin, OUTPUT);
   
   Serial.begin(115200);
-  pinMode(LED_BUILTIN, OUTPUT);
+
+  
+  
+
+////////////BMP INITIALIZATION////////////////
+ 
   unsigned status;
-  //status = bmp.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
   status = bmp.begin(0x76);
   if (!status) {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
@@ -71,15 +70,17 @@ void setup() {
     Serial.print("        ID of 0x61 represents a BME 680.\n");
     while (1) delay(10);
   }
-
   /* Default settings from datasheet. */
   bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
                   Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
                   Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
                   Adafruit_BMP280::FILTER_X16,      /* Filtering. */
                   Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
-
   bmp_temp->printSensorDetails();
+
+
+//////////LoRa INITIALIZATION////////////////
+
   
   LoRa.setPins(8, 9, 7);
   LoRa.setSignalBandwidth(250E3);
@@ -87,6 +88,9 @@ void setup() {
     Serial.println("Starting LoRa failed!");
     while (1);
   }
+
+
+///////////SD INITIZALIZATION////////////////
 
     if (!SD.begin(chipSelect, SPI1)) {
     Serial.println("Card failed, or not present");
@@ -96,44 +100,49 @@ void setup() {
   Serial.println("card initialized.");
 
   digitalWrite(LED_BUILTIN, HIGH);   
-  delay(5000);                       // starting successful led on
+  delay(1000);                       // starting successful led on
   digitalWrite(LED_BUILTIN, LOW);
-//
-//    while (liftoff == false){  //when the pressure changes by a lot the code starts, for testing reasons manual start is also possible
-//
-//      sensors_event_t pressure_event;
-//      bmp_pressure->getEvent(&pressure_event);  
-//      currentpressure = pressure_event.pressure;
-//      
-//      if(currentpressure - previouspressure >= 100){
-//        Serial.println("Big pressure change, starting");
-//      }
-//      else{
-//        previouspressure = currentpressure;
-//        }
-//    
-//      Serial.print(F("Pressure = "));
-//      Serial.print(pressure_event.pressure);
-//      Serial.println(" hPa");
-//
-//      
-//      
-//      Serial.println("Enter data:");
-//      while (Serial.available() == 0) {}     //wait for data available
-//      String teststr = Serial.readString();  //read until timeout
-//      teststr.trim();                        // remove any \r \n whitespace at the end of the String
-//      if (teststr == "start") {
-//        Serial.println("Starting");
-//        liftoff = true;
-//      } else {
-//        Serial.println("what?");
-//      }
-//  }
+
+
+/////////WAITING FOR LAUNCH/////////////////
   
+
+  while (liftoff == false){  //when the pressure changes by a lot the code starts, for testing reasons manual start is also possible
+
+      sensors_event_t pressure_event;
+      bmp_pressure->getEvent(&pressure_event);  
+      currentpressure = pressure_event.pressure;
+      
+      if(currentpressure - previouspressure >= 10){
+        Serial.println("Big pressure change, starting");
+      }
+      else{
+        previouspressure = currentpressure;
+        }
+    
+      Serial.print(F("Pressure = "));
+      Serial.print(pressure_event.pressure);
+      Serial.println(" hPa");
+
+      
+      
+      Serial.println("Enter data:");
+      if (Serial.available() != 0) {     //wait for data available
+        String teststr = Serial.readString();  //read until timeout
+        teststr.trim();                        // remove any \r \n whitespace at the end of the String
+        if (teststr == "start") {
+          Serial.println("Starting");
+          liftoff = true;
+        } else {
+          Serial.println("type 'start' to start");
+        }
+      }
+  }  
 }
 
 void loop() {
-
+  
+///// COLECTING TELEMETRIC DATA SAVING THEM TO SD AND A DATA PACKET /////
   if (millis() - lastSendTime > interval) {
     
       sensors_event_t temp_event, pressure_event;
@@ -155,19 +164,20 @@ void loop() {
       dataString += String(",");
       if (inbox != ""){
         inboxmessage = "";
-        //inboxmessage += String(" Recieved new messages: ");
-        //inboxmessage += String("My Data: ");
         inboxmessage += dataString;
         inboxmessage += String("");
         inboxmessage += fromnode1;
         inboxmessage += String("");
         inboxmessage += fromnode2;
         
-        Serial.println("Sent recieved messages and cleared inbox");
         Serial.println(inboxmessage);
         inbox = "";
         frombaza = "";
       }
+
+
+///SENDING NEEDED MESSAGES///
+      
       if(sleeping == false){
         if(ismain == true){
           sendmessage(inboxmessage, localAddress, baza);
@@ -178,7 +188,9 @@ void loop() {
           sendmessage(inboxmessage, localAddress, useraddress);
         }
       }
-      //save file
+      
+///SAVING DATA TO SD///
+
       File dataFile = SD.open("datalog.txt", FILE_WRITE);
       if (dataFile) {
         dataFile.println(inboxmessage);
@@ -196,31 +208,24 @@ void loop() {
 
   // parse for a packet, and call onReceive with the result:
   receive(LoRa.parsePacket());
+  digitalWrite(powerLEDpin, HIGH);
 }
-
 
 void sendmessage(String inboxmessage, byte sender, byte destination){
   
   LoRa.beginPacket();                   // start packet
   LoRa.write(destination);              // add destination address
   LoRa.write(sender);             // add sender address
-//  LoRa.write(msgCount);                 // add message ID
-//  LoRa.write(outgoing.length());        // add payload length
-//  LoRa.print(outgoing);                 // add payload
   LoRa.print(inboxmessage);
   LoRa.endPacket();                     // finish packet and send it
-//  msgCount++;                           // increment message ID
 }
 
 void receive(int packetSize){
   
   if (packetSize == 0) return;
-
   // read packet header bytes:
   int recipient = LoRa.read();          // recipient address
   byte sender = LoRa.read();            // sender address
-//  byte incomingMsgId = LoRa.read();     // incoming msg ID
-//  byte incomingLength = LoRa.read();    // incoming msg length
 
   if (recipient != localAddress) {
     //Serial.println("This message is not for me.");
@@ -241,14 +246,6 @@ void receive(int packetSize){
 
   inbox += "Message from: ";
   definesender(sender, LoRaData);
-//  inbox += " Message content: ";
-//  inbox += LoRaData;
-
-  
-//  Serial.print(" Current inbox: ");
-//  Serial.println(inbox);
-//  Serial.print("' with RSSI ");
-//  Serial.println(LoRa.packetRssi());
   incoming = "";
 
 }

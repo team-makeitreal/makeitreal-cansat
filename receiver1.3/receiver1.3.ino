@@ -1,7 +1,7 @@
 #include <SPI.h>
 #include <LoRa.h>
 
-byte localAddress = 0xFF;     // address of this device
+byte localAddress = 150;     // address of this device
 byte nodemain = 0xFF;  
 long lastSendTime = 0;        // last send time
 int interval = 50;
@@ -13,7 +13,6 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.println("LoRa Receiver");
   LoRa.setPins(8, 9, 7);
-  LoRa.setSignalBandwidth(250E3);
   if (!LoRa.begin(433E6)) {
     Serial.println("Starting LoRa failed!");
     while (1);

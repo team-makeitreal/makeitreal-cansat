@@ -35,9 +35,9 @@ bool sleeping = false;
 
 
 const int chipSelect = 13;
-int powerLEDpin =0;
-
-bool liftoff = false;
+int buzzer_pin = 24;
+bool buzzer = true;
+bool liftoff = true;
 float previouspressure = 1000;
 float currentpressure;
 
@@ -49,7 +49,7 @@ void setup() {
   SPI1.setCS(13); //17 13 
    
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(powerLEDpin, OUTPUT);
+  pinMode(buzzer_pin, OUTPUT);
   
   Serial.begin(115200);
 
@@ -208,7 +208,8 @@ void loop() {
 
   // parse for a packet, and call onReceive with the result:
   receive(LoRa.parsePacket());
-  digitalWrite(powerLEDpin, HIGH);
+  digitalWrite(LED_BUILTIN, HIGH);
+  digitalWrite(buzzer_pin, HIGH);
 }
 
 void sendmessage(String inboxmessage, byte sender, byte destination){
@@ -258,6 +259,7 @@ void definesender(byte sender, String LoRaData){
       }
       if(frombaza == "nmain"){
           ismain = false;
+          Serial.println("not main anymore :(");
         }
       }
       

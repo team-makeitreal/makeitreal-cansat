@@ -12,6 +12,7 @@ void setup() {
   Serial.begin(9600);
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.println("LoRa Receiver");
+  LoRa.setTxPower(20);
   LoRa.setPins(8, 9, 7);
   if (!LoRa.begin(433E6)) {
     Serial.println("Starting LoRa failed!");
